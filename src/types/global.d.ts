@@ -2,7 +2,7 @@ declare namespace NodeJs {
     interface ProcessEnv {
         JWT_SECRET: string;
         DATABASE_URL: string;
-        RESEND_API_KEY: string;
+        ZEPTO_MAIL_TOKEN: string;
         NEXT_PUBLIC_APP_URL: string;
     }
 }

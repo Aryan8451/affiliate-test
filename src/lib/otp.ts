@@ -1,5 +1,11 @@
 import { prisma } from './prisma';
 import crypto from 'crypto';
+import { SendMailClient } from 'zeptomail';
+
+const url = 'https://render-temp.vercel.app/v1.1/email';
+const token = process.env.ZEPTO_MAIL_TOKEN;
+
+const client = new SendMailClient({ url, token });
 
 export class OTPService {
   // Generate a cryptographically secure 6-digit OTP
@@ -77,23 +83,17 @@ export class OTPService {
         }
       });
 
-      // Send OTP email
-      const { Resend } = await import('resend');
-      const resendClient = new Resend(process.env.RESEND_API_KEY);
-      const emailResult = await resendClient.emails.send({
-        from: process.env.RESEND_FROM_EMAIL!,
-        to: email,
-        subject: 'Your Login Code',
-        html: this.generateOTPEmailTemplate(code, user.name || 'User')
-      });
-
-      if (emailResult.error) {
-        console.error('Failed to send OTP email:', emailResult.error);
-        return {
-          success: false,
-          message: 'Failed to send OTP email. Please try again.'
-        };
+      // Send OTP email via ZeptoMail
+      if (!token) {
+        throw new Error('ZEPTO_MAIL_TOKEN environment variable is not set');
       }
+
+      const result = await client.sendMail({
+        from: { address: 'noreply@quickdm.app', name: 'QuickDM Support' },
+        to: [{ email_address: { address: email, name: user.name || 'User' } }],
+        subject: 'Your Login Code',
+        htmlbody: this.generateOTPEmailTemplate(code, user.name || 'User'),
+      });
 
       return {
         success: true,

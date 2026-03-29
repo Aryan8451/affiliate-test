@@ -1,24 +1,9 @@
-import { Resend } from 'resend';
+import { SendMailClient } from 'zeptomail';
 
-// Initialize Resend with API key only when needed (server-side)
-let resendInstance: Resend | null = null;
+const url = 'https://render-temp.vercel.app/v1.1/email';
+const token = process.env.ZEPTO_MAIL_TOKEN;
 
-function getResendClient(): Resend {
-  if (!resendInstance) {
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) {
-      throw new Error('RESEND_API_KEY environment variable is not set');
-    }
-    resendInstance = new Resend(apiKey);
-  }
-  return resendInstance;
-}
-
-export const resend = {
-  get emails() {
-    return getResendClient().emails;
-  }
-};
+const client = new SendMailClient({ url, token });
 
 export interface EmailTemplate {
   to: string;
@@ -83,7 +68,7 @@ export interface CommissionNotificationData {
 }
 
 class EmailService {
-  private defaultFrom = process.env.RESEND_FROM_EMAIL || 'Refferq <noreply@refferq.com>';
+  private defaultFrom = 'QuickDM Support <noreply@quickdm.app>';
 
   /** Escape HTML special characters to prevent XSS in email templates */
   private escapeHtml(str: string): string {
@@ -129,14 +114,15 @@ class EmailService {
     html: string;
   }): Promise<{ success: boolean; message: string }> {
     try {
-      const { Resend } = await import('resend');
-      const resend = new Resend(process.env.RESEND_API_KEY);
+      if (!token) {
+        throw new Error('ZEPTO_MAIL_TOKEN environment variable is not set');
+      }
 
-      const result = await resend.emails.send({
-        from: this.defaultFrom,
-        to: params.to,
+      const result = await client.sendMail({
+        from: { address: 'noreply@quickdm.app', name: 'QuickDM Support' },
+        to: [{ email_address: { address: params.to, name: 'User' } }],
         subject: params.subject,
-        html: params.html,
+        htmlbody: params.html,
       });
 
       return { success: true, message: 'Email sent successfully' };
@@ -882,16 +868,18 @@ class EmailService {
 
   async sendCustomEmail(to: string, subject: string, html: string): Promise<{ success: boolean; message: string }> {
     try {
-      const { Resend } = await import('resend');
-      const resend = new Resend(process.env.RESEND_API_KEY);
-      const result = await resend.emails.send({
-        from: this.defaultFrom,
-        to,
+      if (!token) {
+        throw new Error('ZEPTO_MAIL_TOKEN environment variable is not set');
+      }
+
+      const result = await client.sendMail({
+        from: { address: 'noreply@quickdm.app', name: 'QuickDM Support' },
+        to: [{ email_address: { address: to, name: 'User' } }],
         subject,
-        html,
+        htmlbody: html,
       });
 
-      console.log('Custom email sent:', result);
+      console.log('Custom email sent successfully');
       return { success: true, message: 'Email sent successfully' };
     } catch (error) {
       console.error('Failed to send custom email:', error);
