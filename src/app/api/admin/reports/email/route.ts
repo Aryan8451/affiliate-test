@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { resend } from '@/lib/email';
+import { emailService } from '@/lib/email';
 
 async function verifyAdmin(request: NextRequest) {
   try {
@@ -81,23 +81,21 @@ export async function POST(request: NextRequest) {
         </p>
       </div>
       <div class="footer">
-        <p>This report was sent from Refferq by ${user.name} (${user.email})</p>
-        <p>© ${new Date().getFullYear()} Refferq. All rights reserved.</p>
+        <p>This report was sent from QuickDM by ${user.name} (${user.email})</p>
+        <p>© ${new Date().getFullYear()} QuickDM. All rights reserved.</p>
       </div>
     </body>
     </html>
     `;
 
     // Send to all recipients
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'Refferq <noreply@refferq.com>';
     const results = await Promise.allSettled(
       recipients.map((email: string) =>
-        resend.emails.send({
-          from: fromEmail,
-          to: email.trim(),
-          subject: `[Refferq] ${reportData.type || 'Report'} — ${reportDate}`,
-          html,
-        })
+        emailService.sendCustomEmail(
+          email.trim(),
+          `[QuickDM] ${reportData.type || 'Report'} — ${reportDate}`,
+          html
+        )
       )
     );
 
