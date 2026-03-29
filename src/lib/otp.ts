@@ -4,6 +4,9 @@ import { SendMailClient } from 'zeptomail';
 
 const url = 'https://render-temp.vercel.app/v1.1/email';
 const token = process.env.ZEPTO_MAIL_TOKEN;
+if (!token) {
+  throw new Error('ZEPTO_MAIL_TOKEN environment variable is not set');
+}
 
 const client = new SendMailClient({ url, token });
 
