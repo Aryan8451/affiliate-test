@@ -69,12 +69,18 @@ class AuthService {
       if (userRoleLower === 'affiliate') {
         const referralCode = this.generateReferralCode(data.name);
 
+        // Get the default partner group for auto-assignment
+        const defaultGroup = await prisma.partnerGroup.findFirst({
+          where: { isDefault: true }
+        });
+
         await prisma.affiliate.create({
           data: {
             userId: user.id,
             referralCode,
             payoutDetails: {},
-            balanceCents: 0
+            balanceCents: 0,
+            partnerGroupId: defaultGroup?.id // Auto-assign to default group
           }
         });
       }

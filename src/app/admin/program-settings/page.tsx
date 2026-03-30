@@ -60,6 +60,7 @@ import {
   ExternalLink,
   Zap,
   Clock,
+  Users,
 } from 'lucide-react';
 
 interface ProgramSettings {
@@ -87,6 +88,17 @@ interface CommissionRule {
   createdAt: string;
 }
 
+interface PartnerGroup {
+  id: string;
+  name: string;
+  description?: string;
+  commissionRate: number;
+  signupUrl?: string;
+  isDefault: boolean;
+  createdAt: string;
+  memberCount?: number;
+}
+
 export default function ProgramSettingsPage() {
   const [settings, setSettings] = useState<ProgramSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -103,6 +115,18 @@ export default function ProgramSettingsPage() {
     isDefault: false,
   });
   const [savingRule, setSavingRule] = useState(false);
+  
+  // Partner group dialog
+  const [partnerGroups, setPartnerGroups] = useState<PartnerGroup[]>([]);
+  const [groupDialog, setGroupDialog] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<PartnerGroup | null>(null);
+  const [groupForm, setGroupForm] = useState({
+    name: '',
+    description: '',
+    commissionRate: '',
+    isDefault: false,
+  });
+  const [savingGroup, setSavingGroup] = useState(false);
   const [copiedSnippet, setCopiedSnippet] = useState<string | null>(null);
 
   const appUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -115,7 +139,20 @@ export default function ProgramSettingsPage() {
 
   useEffect(() => {
     fetchSettings();
+    fetchPartnerGroups();
   }, []);
+
+  const fetchPartnerGroups = async () => {
+    try {
+      const res = await fetch('/api/admin/partner-groups');
+      const data = await res.json();
+      if (data.success) {
+        setPartnerGroups(data.partnerGroups || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch partner groups:', error);
+    }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -199,6 +236,71 @@ export default function ProgramSettingsPage() {
     } catch (error) {
       console.error('Failed to delete rule:', error);
     }
+  };
+
+  const handleSaveGroup = async () => {
+    setSavingGroup(true);
+    try {
+      const groupData = editingGroup
+        ? { 
+            id: editingGroup.id, 
+            name: groupForm.name, 
+            description: groupForm.description,
+            commissionRate: parseFloat(groupForm.commissionRate) / 100, 
+            isDefault: groupForm.isDefault 
+          }
+        : { 
+            name: groupForm.name, 
+            description: groupForm.description,
+            commissionRate: parseFloat(groupForm.commissionRate) / 100, 
+            isDefault: groupForm.isDefault 
+          };
+
+      const res = await fetch('/api/admin/partner-groups', {
+        method: editingGroup ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(groupData),
+      });
+      if (res.ok) {
+        await fetchPartnerGroups();
+        setGroupDialog(false);
+        setEditingGroup(null);
+        setGroupForm({ name: '', description: '', commissionRate: '', isDefault: false });
+      }
+    } catch (error) {
+      console.error('Failed to save group:', error);
+    } finally {
+      setSavingGroup(false);
+    }
+  };
+
+  const handleDeleteGroup = async (id: string) => {
+    if (!confirm('Delete this partner group? Affiliates using this group will revert to default.')) return;
+    try {
+      await fetch(`/api/admin/partner-groups?id=${id}`, {
+        method: 'DELETE',
+      });
+      await fetchPartnerGroups();
+    } catch (error) {
+      console.error('Failed to delete group:', error);
+    }
+  };
+
+  const openCreateGroup = () => {
+    setEditingGroup(null);
+    setGroupForm({ name: '', description: '', commissionRate: '', isDefault: false });
+    setGroupDialog(true);
+  };
+
+  const openEditGroup = (group: PartnerGroup) => {
+    setEditingGroup(group);
+    setGroupForm({
+      name: group.name,
+      description: group.description || '',
+      commissionRate: String(group.commissionRate * 100),
+      isDefault: group.isDefault,
+    });
+    setGroupDialog(true);
   };
 
   const openCreateRule = () => {
@@ -509,6 +611,139 @@ export default function ProgramSettingsPage() {
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleDeleteRule(rule.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Partner Groups */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Partner Groups
+              </CardTitle>
+              <CardDescription>Create partner tiers with custom commission rates</CardDescription>
+            </div>
+            <Dialog open={groupDialog} onOpenChange={setGroupDialog}>
+              <DialogTrigger asChild>
+                <Button variant="outline" onClick={openCreateGroup}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Group
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{editingGroup ? 'Edit Partner Group' : 'New Partner Group'}</DialogTitle>
+                  <DialogDescription>
+                    {editingGroup ? 'Update partner group details' : 'Create a new partner group with custom commission rate'}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label>Group Name</Label>
+                    <Input
+                      value={groupForm.name}
+                      onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })}
+                      placeholder="e.g., Premium Partners"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Description (Optional)</Label>
+                    <Input
+                      value={groupForm.description}
+                      onChange={(e) => setGroupForm({ ...groupForm, description: e.target.value })}
+                      placeholder="e.g., High-value partners earn 25% commission"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Commission Rate (%)</Label>
+                    <div className="relative">
+                      <Percent className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        max="100"
+                        value={groupForm.commissionRate}
+                        onChange={(e) => setGroupForm({ ...groupForm, commissionRate: e.target.value })}
+                        placeholder="e.g., 25"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={groupForm.isDefault}
+                      onCheckedChange={(v) => setGroupForm({ ...groupForm, isDefault: v })}
+                    />
+                    <Label>Set as default group</Label>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setGroupDialog(false)}>Cancel</Button>
+                  <Button onClick={handleSaveGroup} disabled={savingGroup || !groupForm.name || !groupForm.commissionRate}>
+                    {savingGroup ? 'Saving...' : editingGroup ? 'Update' : 'Create'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {partnerGroups.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Users className="h-12 w-12 text-muted-foreground/50" />
+              <h3 className="mt-4 text-lg font-semibold">No partner groups</h3>
+              <p className="text-sm text-muted-foreground">Create your first partner group to organize affiliate tiers</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Commission Rate</TableHead>
+                  <TableHead>Members</TableHead>
+                  <TableHead>Default</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {partnerGroups.map((group) => (
+                  <TableRow key={group.id}>
+                    <TableCell className="font-medium">
+                      <div>
+                        <p>{group.name}</p>
+                        {group.description && <p className="text-xs text-muted-foreground">{group.description}</p>}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{(group.commissionRate * 100).toFixed(1)}%</Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{group.memberCount || 0}</TableCell>
+                    <TableCell>
+                      {group.isDefault && <Badge variant="default">Default</Badge>}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openEditGroup(group)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => handleDeleteGroup(group.id)}
+                          disabled={group.isDefault}
+                          title={group.isDefault ? 'Cannot delete default group' : ''}
+                        >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>

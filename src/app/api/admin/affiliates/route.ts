@@ -124,12 +124,18 @@ export async function POST(request: NextRequest) {
     });
 
     // Create affiliate profile
+    // Get the default partner group for auto-assignment
+    const defaultGroup = await prisma.partnerGroup.findFirst({
+      where: { isDefault: true }
+    });
+
     const affiliate = await prisma.affiliate.create({
       data: {
         userId: newUser.id,
         referralCode: `AF${Date.now()}${(await import('crypto')).randomBytes(3).toString('hex').toUpperCase().slice(0, 4)}`,
         balanceCents: 0,
-        payoutDetails: {}
+        payoutDetails: {},
+        partnerGroupId: defaultGroup?.id // Auto-assign to default group
       }
     });
 
